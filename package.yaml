@@ -34,6 +34,8 @@ ghc-options:
 - -Wmissing-home-modules
 - -Wpartial-fields
 - -Wredundant-constraints
+- -optl-static
+- -optl-pthread
 
 executables:
   memcached-replicator:
