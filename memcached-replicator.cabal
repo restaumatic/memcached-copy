@@ -36,9 +36,11 @@ executable memcached-replicator
       async
     , base >=4.7 && <5
     , bytestring
+    , containers
     , memcache
     , network
     , random
     , text
     , uri-encode
+    , vector
   default-language: Haskell2010

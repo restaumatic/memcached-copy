@@ -21,6 +21,8 @@ dependencies:
 - random
 - bytestring
 - async
+- vector
+- containers
 
 ghc-options:
 - -Wall

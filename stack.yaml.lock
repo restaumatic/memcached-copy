@@ -3,7 +3,18 @@
 # For more information, please see the documentation at:
 #   https://docs.haskellstack.org/en/stable/lock_files
 
-packages: []
+packages:
+- completed:
+    commit: 13b1c2b703f73d69588dca97338c3ce5cc26ecd9
+    git: https://github.com/dterei/memcache-hs
+    name: memcache
+    pantry-tree:
+      sha256: a0b19358e0ea40d56648529306255735d6701e982c031a012e2f7835c88c87ff
+      size: 1824
+    version: 0.3.0.2
+  original:
+    commit: 13b1c2b703f73d69588dca97338c3ce5cc26ecd9
+    git: https://github.com/dterei/memcache-hs
 snapshots:
 - completed:
     sha256: 2fdd7d3e54540062ef75ca0a73ca3a804c527dbf8a4cadafabf340e66ac4af40
