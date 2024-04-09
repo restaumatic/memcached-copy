@@ -34,6 +34,8 @@ ghc-options:
 - -Wmissing-home-modules
 - -Wpartial-fields
 - -Wredundant-constraints
+
+# See https://ro-che.info/articles/2015-10-26-static-linking-ghc
 - -optl-static
 - -optl-pthread
 
