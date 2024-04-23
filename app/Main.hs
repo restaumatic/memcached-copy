@@ -7,6 +7,7 @@
 
 module Main (main) where
 
+import Prelude hiding (log)
 import System.Environment (getArgs)
 import Network.Socket (getAddrInfo, defaultHints, AddrInfo (..), SocketType (..))
 import qualified Network.Socket  as Socket
@@ -61,12 +62,10 @@ main = do
 
       toServerSpec addr = MC.def { MC.ssHost = showIP (addrAddress addr) }
 
-  addrs <- getServers
-
   serversCache <- newIORef mempty
   serversMVar <- newMVar mempty
 
-  let updateServers = do
+  let updateServers = squashException "updateServers" do
         oldServers <- readIORef serversCache
         addrs' <- getServers
         servers <- forM addrs' \addr -> do
@@ -74,7 +73,7 @@ main = do
           server <- case Map.lookup key oldServers of
             Just s -> pure s
             Nothing -> do
-              putStrLn $ "Discovered new server " <> key
+              log $ "Discovered new server " <> key
               MC.newServerDefault $ toServerSpec addr
           pure (key, server)
         writeIORef serversCache (Map.fromList servers)
@@ -83,11 +82,11 @@ main = do
   updateServers
   void $ forkIO $ forever do
     threadDelay 5000000
-    updateServers
+    squashException "updateServers" updateServers
 
   allClient <- flip MC.setServers (Left serversMVar) <$> MC.newClient [] MC.def
 
-  let watchSelf = do
+  let watchSelf = squashException "watching changes from self" do
         [addr] <- getAddrInfo (Just hints) (Just self) (Just "11211")
         bracket (Socket.openSocket addr) Socket.close \s1 -> do
           Socket.connect s1 (addrAddress addr)
@@ -107,48 +106,54 @@ main = do
               let key' = Text.encodeUtf8 key
               m_value <- MC.get selfClient key'
               forM_ m_value \(value, flags, _) -> do
-                if flags .&. FLAG_REPLICATED /= 0 then
-                  Text.putStrLn $ "got replicated change of " <> key <> ", ignoring"
-                else do
-                  Text.putStrLn $ "replicating change of " <> key
-                  handle (\(e :: SomeException) -> putStrLn (show e)) $
+                when (flags .&. FLAG_REPLICATED == 0) $
+                  squashException "replicating key" $
                     void $ MC.allOp allClient $ MC.emptyReq { MC.reqOp = MC.ReqSet MC.Loud key' value (MC.SESet (flags .|. FLAG_REPLICATED) ttl) }
 
             when (line /= "" && line /= "END") loop
+
+      watchSelfForever = forever do
+        watchSelf
+        threadDelay 1000000
 
       copyFromServer addr = do
         let ip = showIP (addrAddress addr)
         client <- MC.newClient [toServerSpec addr] MC.def
 
-        putStrLn $ "copying from " <> ip
+        squashException ("copying data from " <> ip) do
+          log $ "copying data from " <> ip
 
-        bracket (Socket.openSocket addr) Socket.close \s1 -> do
-          Socket.connect s1 (addrAddress addr)
-          h <- Socket.socketToHandle s1 ReadWriteMode
-          hSetBuffering h (BlockBuffering Nothing)
+          bracket (Socket.openSocket addr) Socket.close \s1 -> do
+            Socket.connect s1 (addrAddress addr)
+            h <- Socket.socketToHandle s1 ReadWriteMode
+            hSetBuffering h (BlockBuffering Nothing)
 
-          Text.hPutStrLn h "lru_crawler metadump all"
-          hFlush h
+            Text.hPutStrLn h "lru_crawler metadump all"
+            hFlush h
 
-          fix \loop -> do
-            line <- Text.strip <$> Text.hGetLine h
-            forM_ (parseMetadumpLine line) \(key, expirationTime) -> do
-              let key' = Text.encodeUtf8 key
-              m_value <- MC.get client key'
-              forM_ m_value \(value, flags, _) -> do
-                void $ MC.set selfClient key' value (flags .|. FLAG_REPLICATED) expirationTime
+            fix \loop -> do
+              line <- Text.strip <$> Text.hGetLine h
+              forM_ (parseMetadumpLine line) \(key, expirationTime) -> do
+                let key' = Text.encodeUtf8 key
+                m_value <- MC.get client key'
+                forM_ m_value \(value, flags, _) -> do
+                  void $ MC.set selfClient key' value (flags .|. FLAG_REPLICATED) expirationTime
 
-            when (line /= "" && line /= "END") loop
+              when (line /= "" && line /= "END") loop
 
-  concurrently_ watchSelf (mapConcurrently_ copyFromServer addrs)
+      copyFromOthers = do
+        addrs <- retryForever "getServers" getServers
+        mapConcurrently_ copyFromServer addrs
+
+  concurrently_ watchSelfForever copyFromOthers
       
 isSameAs :: MC.Client -> MC.Client -> IO Bool
 isSameAs selfClient client = do
-      randomKey <- Text.encodeUtf8 . Text.pack . show <$> randomIO @Int
-      _ <- MC.set selfClient randomKey "" FLAG_REPLICATED 3600
-      result <- MC.get client randomKey
-      _ <- MC.delete selfClient randomKey 0
-      pure $ isJust result
+  randomKey <- Text.encodeUtf8 . Text.pack . show <$> randomIO @Int
+  _ <- MC.set selfClient randomKey "" FLAG_REPLICATED 3600
+  result <- MC.get client randomKey
+  _ <- MC.delete selfClient randomKey 0
+  pure $ isJust result
 
 parseMetadumpLine :: Text -> Maybe (Text, Expiration)
 parseMetadumpLine t = do
@@ -170,3 +175,21 @@ showIP = \case
     let (a,b,c,d) = Socket.hostAddressToTuple addr
     in intercalate "." $ map show [a,b,c,d]
   x -> error $ "Expected SockAddrInet, got " <> show x
+
+squashException :: String -> IO () -> IO ()
+squashException operationName =
+  handle (\(e :: SomeException) -> log $ operationName <> " failed with exception: " <> show e)
+
+retryForever :: String -> IO a -> IO a
+retryForever operationName block = fix \loop -> do
+  r <- try block
+  case r of
+    Left (e::SomeException) -> do
+      log $ operationName <> " failed with exception: " <> show e <> ", will retry"
+      threadDelay 1000000
+      loop
+    Right x ->
+      pure x
+
+log :: String -> IO ()
+log s = putStrLn $ "memcached-replicator: " <> s
