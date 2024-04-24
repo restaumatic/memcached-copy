@@ -12,7 +12,7 @@ It assumes some things about your architecture:
 - `DELETE`s are unreliable. In fact, `memcached-replicator` doesn't replicate DELETEs at all. We discourage using them for invalidation in this architecture
 - `SET`s may also fail to overwrite an older value. (Note that `SET`s are always unreliable in some sense in memcached, since any key can be evicted; but single-node memcached doesn't allow a key to return to a previous value).
 
-In short, when using this system, if you read from memcached, you can get not only the latest value, but any value previously written to a given key (although most of the time it should be the latest value).
+In short, when using this system, if you read from memcached, you can get not only the latest value, but any value previously written to a given key (although most of the time it should be the latest value). In particular it could happen that a server with older value replicates it to other servers (including ones that contained latest value).
 
 This works well if your objects are immutable - this is the case e.g. in Rails' key-based expiration scheme (new version of an object is written under a new key).
 
