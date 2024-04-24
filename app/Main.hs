@@ -178,18 +178,26 @@ showIP = \case
 
 squashException :: String -> IO () -> IO ()
 squashException operationName =
-  handle (\(e :: SomeException) -> log $ operationName <> " failed with exception: " <> show e)
+  handle \(e :: SomeException) -> do
+    rethrowIfAsync e
+    log $ operationName <> " failed with exception: " <> show e
 
 retryForever :: String -> IO a -> IO a
 retryForever operationName block = fix \loop -> do
   r <- try block
   case r of
-    Left (e::SomeException) -> do
+    Left (e :: SomeException) -> do
+      rethrowIfAsync e
       log $ operationName <> " failed with exception: " <> show e <> ", will retry"
       threadDelay 1000000
       loop
     Right x ->
       pure x
+
+rethrowIfAsync :: SomeException -> IO ()
+rethrowIfAsync e =
+  forM_ (fromException e) \(ae :: SomeAsyncException) ->
+    throwIO ae
 
 log :: String -> IO ()
 log s = putStrLn $ "memcached-replicator: " <> s
