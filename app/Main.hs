@@ -50,7 +50,7 @@ main = do
         rs <- makeResolvSeed defaultResolvConf
         ips <- withResolver rs $ \resolver -> lookupA resolver (BS.pack hostname)
         let addrs = map (\ip -> Socket.SockAddrInet 11211 (Socket.tupleToHostAddress (toTuple ip))) (fromRight [] ips)
-            toTuple ip = let (a, b, c, d) = fromIntegral <$> (fromIPv4 ip) in (a, b, c, d)
+            toTuple ip = let (a, b, c, d) = fromIPv4 ip in (fromIntegral a, fromIntegral b, fromIntegral c, fromIntegral d)
         catMaybes <$> forConcurrently addrs \addr -> do
           isSelf <- bracket (MC.newClient [toServerSpec addr] MC.def) MC.quit (isSameAs selfClient)
           if isSelf then do
@@ -69,7 +69,7 @@ main = do
 
           client <- MC.newClient [toServerSpec addr] MC.def
 
-          bracket (Socket.openSocket addr) Socket.close \s1 -> do
+          bracket (Socket.socket Socket.AF_INET Socket.Stream Socket.defaultProtocol) Socket.close \s1 -> do
             Socket.connect s1 addr
             h <- Socket.socketToHandle s1 ReadWriteMode
             hSetBuffering h (BlockBuffering Nothing)
