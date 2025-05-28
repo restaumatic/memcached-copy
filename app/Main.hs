@@ -50,7 +50,9 @@ main = do
         rs <- makeResolvSeed defaultResolvConf
         ips <- withResolver rs $ \resolver -> lookupA resolver (BS.pack hostname)
         let addrs = map (\ip -> Socket.SockAddrInet 11211 (Socket.tupleToHostAddress (toTuple ip))) (fromRight [] ips)
-            toTuple ip = let (a, b, c, d) = fromIPv4 ip in (fromIntegral a, fromIntegral b, fromIntegral c, fromIntegral d)
+            toTuple ip = case fromIPv4 ip of
+              [a, b, c, d] -> (fromIntegral a, fromIntegral b, fromIntegral c, fromIntegral d)
+              _ -> error "Invalid IPv4 address format"
         catMaybes <$> forConcurrently addrs \addr -> do
           isSelf <- bracket (MC.newClient [toServerSpec addr] MC.def) MC.quit (isSameAs selfClient)
           if isSelf then do
