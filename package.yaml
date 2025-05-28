@@ -1,6 +1,6 @@
-name:                memcached-replicator
+name:                memcached-copy
 version:             0.1.0.0
-github:              "restaumatic/memcached-replicator"
+github:              "restaumatic/memcached-copy"
 license:             BSD-3-Clause
 author:              "Author name here"
 maintainer:          "example@example.com"
@@ -10,7 +10,7 @@ extra-source-files:
 - README.md
 - CHANGELOG.md
 
-description:         memcached-replicator
+description:         memcached-copy
 
 dependencies:
 - base >= 4.7 && < 5
@@ -40,6 +40,6 @@ ghc-options:
 - -optl-pthread
 
 executables:
-  memcached-replicator:
+  memcached-copy:
     main:                Main.hs
     source-dirs:         app

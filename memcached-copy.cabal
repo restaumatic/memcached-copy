@@ -4,11 +4,11 @@ cabal-version: 2.2
 --
 -- see: https://github.com/sol/hpack
 
-name:           memcached-replicator
+name:           memcached-copy
 version:        0.1.0.0
-description:    memcached-replicator
-homepage:       https://github.com/restaumatic/memcached-replicator#readme
-bug-reports:    https://github.com/restaumatic/memcached-replicator/issues
+description:    memcached-copy
+homepage:       https://github.com/restaumatic/memcached-copy#readme
+bug-reports:    https://github.com/restaumatic/memcached-copy/issues
 author:         Author name here
 maintainer:     example@example.com
 copyright:      2024 Author name here
@@ -21,14 +21,14 @@ extra-source-files:
 
 source-repository head
   type: git
-  location: https://github.com/restaumatic/memcached-replicator
+  location: https://github.com/restaumatic/memcached-copy
 
-executable memcached-replicator
+executable memcached-copy
   main-is: Main.hs
   other-modules:
-      Paths_memcached_replicator
+      Paths_memcached_copy
   autogen-modules:
-      Paths_memcached_replicator
+      Paths_memcached_copy
   hs-source-dirs:
       app
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints -optl-static -optl-pthread
