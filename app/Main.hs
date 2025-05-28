@@ -48,7 +48,7 @@ main = do
   let getServers = do
         rs <- makeResolvSeed defaultResolvConf
         ips <- withResolver rs $ \resolver -> lookupA resolver (BS.pack hostname)
-        let addrs = map (\ip -> AddrInfo (Just Socket.AF_INET) Socket.Stream Socket.defaultProtocol (Socket.SockAddrInet 11211 (Socket.tupleToHostAddress (fromIntegral <$> ip))) Nothing Nothing) (fromRight [] ips)
+        let addrs = map (\ip -> AddrInfo defaultHints { addrFamily = Socket.AF_INET, addrSocketType = Socket.Stream, addrProtocol = Socket.defaultProtocol } (Socket.SockAddrInet 11211 (Socket.tupleToHostAddress (fromIntegral <$> ip))) Nothing Nothing) (fromRight [] ips)
         catMaybes <$> forConcurrently addrs \addr -> do
           isSelf <- bracket (MC.newClient [toServerSpec addr] MC.def) MC.quit (isSameAs selfClient)
           if isSelf then do
