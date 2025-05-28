@@ -47,7 +47,10 @@ main = do
   let getServers = do
         rs <- makeResolvSeed defaultResolvConf
         ips <- withResolver rs $ \resolver -> lookupA resolver (BS.pack hostname)
-        let addrs = map (Socket.SockAddrInet 11211 . Socket.tupleToHostAddress . toTuple) (fromRight [] ips)
+        case ips of
+          Left err -> throwIO $ userError $ "DNS lookup failed: " <> show err
+          Right ipList -> do
+            let addrs = map (Socket.SockAddrInet 11211 . Socket.tupleToHostAddress . toTuple) ipList
             toTuple ip = case fromIPv4 ip of
               [a, b, c, d] -> (fromIntegral a, fromIntegral b, fromIntegral c, fromIntegral d)
               _ -> error "Invalid IPv4 address format"
