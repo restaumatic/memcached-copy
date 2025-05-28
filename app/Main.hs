@@ -41,7 +41,7 @@ pattern FLAG_REPLICATED = 1
 main :: IO ()
 main = do
   [hostname, self] <- getArgs
-  let hints = defaultHints { addrSocketType = Stream }
+  let hints = defaultHints
 
   selfClient <- MC.newClient [MC.def { MC.ssHost = self }] MC.def
 
