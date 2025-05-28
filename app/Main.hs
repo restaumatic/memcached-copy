@@ -39,7 +39,10 @@ import Database.Memcache.Types (Expiration)
 pattern FLAG_REPLICATED :: Word32
 pattern FLAG_REPLICATED = 1
 
-main :: IO ()
+toTuple :: IPv4 -> (Word8, Word8, Word8, Word8)
+toTuple ip = case fromIPv4 ip of
+  [a, b, c, d] -> (fromIntegral a, fromIntegral b, fromIntegral c, fromIntegral d)
+  _ -> error "Invalid IPv4 address format"
 main = do
   [hostname, self] <- getArgs
   selfClient <- MC.newClient [MC.def { MC.ssHost = self }] MC.def
@@ -51,9 +54,6 @@ main = do
           Left err -> throwIO $ userError $ "DNS lookup failed: " <> show err
           Right ipList -> do
             let addrs = map (Socket.SockAddrInet 11211 . Socket.tupleToHostAddress . toTuple) ipList
-            toTuple ip = case fromIPv4 ip of
-              [a, b, c, d] -> (fromIntegral a, fromIntegral b, fromIntegral c, fromIntegral d)
-              _ -> error "Invalid IPv4 address format"
         catMaybes <$> forConcurrently addrs \addr -> do
           isSelf <- bracket (MC.newClient [toServerSpec addr] MC.def) MC.quit (isSameAs selfClient)
           if isSelf then do
