@@ -9,7 +9,9 @@ module Main (main) where
 
 import Prelude hiding (log)
 import System.Environment (getArgs)
-import Network.Socket (getAddrInfo, defaultHints, AddrInfo (..), SocketType (..))
+import Network.Socket (defaultHints, AddrInfo (..), SocketType (..))
+import Network.DNS (lookupA, makeResolvSeed, withResolver, defaultResolvConf)
+import Data.Either (fromRight)
 import qualified Network.Socket  as Socket
 import Control.Monad (forM_, when, void)
 import Control.Exception
@@ -43,7 +45,9 @@ main = do
   selfClient <- MC.newClient [MC.def { MC.ssHost = self }] MC.def
 
   let getServers = do
-        addrs <- sortOn addrAddress <$> getAddrInfo (Just hints) (Just hostname) (Just "11211")
+        rs <- makeResolvSeed defaultResolvConf
+        ips <- withResolver rs $ \resolver -> lookupA resolver hostname
+        let addrs = map (\ip -> AddrInfo [] Stream defaultHints (Socket.SockAddrInet 11211 (Socket.tupleToHostAddress (fromIntegral <$> ip))) Nothing Nothing) (fromRight [] ips)
         catMaybes <$> forConcurrently addrs \addr -> do
           isSelf <- bracket (MC.newClient [toServerSpec addr] MC.def) MC.quit (isSameAs selfClient)
           if isSelf then do
