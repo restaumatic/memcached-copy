@@ -1,6 +1,10 @@
-# memcached-replicator
+# memcached-copy
 
-`memcached-replicator` is a simple replication system for memcached.
+`memcached-copy` is a small program to run alongside a `memcached` instance.
+
+It discovers other instances (under a given DNS name) and copies all data from them to the local instance.
+
+It is part of a replication scheme where all keys are replicated to all instances. 
 
 It assumes some things about your architecture:
 
@@ -18,9 +22,9 @@ This works well if your objects are immutable - this is the case e.g. in Rails' 
 
 ## How it works
 
-`memcached-replicator` should be deployed alongside each of the memcached instances (e.g. in the same container, or in a sidecar container).
+`memcached-copy` should be deployed alongside each of the memcached instances (e.g. in the same container, or in a sidecar container).
 
-Usage: `memcached-replicator <discovery address> <self address>`
+Usage: `memcached-copy <discovery address> <self address>`
 
 Where:
 
@@ -31,18 +35,9 @@ Note: port is hardcoded to `11211`. If you want to change it, you need to patch 
 
 On startup, `replicator` discovers other servers and unceremoniously copies all data from them to the local server.
 
-It also watches changes in the local server (using memcached's watcher functionality) and copies the changed keys to all other servers.
-
-The service discovery query is repeated in the background, so that if new servers appear, we also start replicating to them. However, copying is done only from servers present at startup. (Note that a newly appearing server shouldn't have any data we don't also have, and it will be seeding from us).
-
 ## Application usage
 
-The application may read from any of the servers, and write to any one server. However, replication has non-trivial latency (~1 second) due to how memcached watcher works, so it's preferable to stay somewhat consistent to avoid tundering herd on cache misses.
-
-## Avoiding replication loops
-
-`memcached`'s watcher will also send us changes from other `replicator`s. Obviously we don't want to replicate them again.
-For that we use memcached `flags`. We set bit `1` on all replication `SET`s, and ignore changes with this bit set in flags. This suppresses replication loops.
+The application may read from any of the servers, and should write to all servers.
 
 ## Discovering self
 

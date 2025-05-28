@@ -11,7 +11,7 @@ import Prelude hiding (log)
 import System.Environment (getArgs)
 import Network.Socket (getAddrInfo, defaultHints, AddrInfo (..), SocketType (..))
 import qualified Network.Socket  as Socket
-import Control.Monad (forM_, when, void, forever, forM)
+import Control.Monad (forM_, when, void)
 import Control.Exception
 import GHC.IO.IOMode (IOMode(ReadWriteMode))
 import GHC.IO.Handle (hSetBuffering, BufferMode (..), hFlush)
@@ -25,24 +25,15 @@ import Data.Text (Text)
 import qualified Network.URI.Encode as URIEncode
 import System.Random (randomIO)
 import Data.Maybe (isJust, catMaybes)
-import Control.Concurrent.Async (forConcurrently, concurrently_, mapConcurrently_)
+import Control.Concurrent.Async (forConcurrently, mapConcurrently_)
 import Data.Bits
 import Data.Word
-import qualified Database.Memcache.Cluster as MC
-import Control.Concurrent (newMVar, threadDelay, forkIO)
-import Control.Concurrent.MVar (swapMVar)
-import qualified Data.Vector as V
-import qualified Database.Memcache.Server as MC
-import Data.IORef (newIORef, readIORef, writeIORef)
-import qualified Data.Map as Map
+import Control.Concurrent (threadDelay)
 import Text.Read (readMaybe)
 import Database.Memcache.Types (Expiration)
-import qualified Database.Memcache.Types as MC
 
 pattern FLAG_REPLICATED :: Word32
 pattern FLAG_REPLICATED = 1
-
-data CopyMode = Dump | Watch deriving (Show, Eq)
 
 main :: IO ()
 main = do
@@ -62,66 +53,13 @@ main = do
 
       toServerSpec addr = MC.def { MC.ssHost = showIP (addrAddress addr) }
 
-  serversCache <- newIORef mempty
-  serversMVar <- newMVar mempty
-
-  let updateServers = squashException "updateServers" do
-        oldServers <- readIORef serversCache
-        addrs' <- getServers
-        servers <- forM addrs' \addr -> do
-          let key = showIP (addrAddress addr)
-          server <- case Map.lookup key oldServers of
-            Just s -> pure s
-            Nothing -> do
-              log $ "Discovered new server " <> key
-              MC.newServerDefault $ toServerSpec addr
-          pure (key, server)
-        writeIORef serversCache (Map.fromList servers)
-        void $ swapMVar serversMVar (V.fromList $ fmap snd servers)
-
-  updateServers
-  void $ forkIO $ forever do
-    threadDelay 5000000
-    squashException "updateServers" updateServers
-
-  allClient <- flip MC.setServers (Left serversMVar) <$> MC.newClient [] MC.def
-
-  let watchSelf = squashException "watching changes from self" do
-        [addr] <- getAddrInfo (Just hints) (Just self) (Just "11211")
-        bracket (Socket.openSocket addr) Socket.close \s1 -> do
-          Socket.connect s1 (addrAddress addr)
-          h <- Socket.socketToHandle s1 ReadWriteMode
-          hSetBuffering h (BlockBuffering Nothing)
-
-          Text.hPutStrLn h "watch mutations"
-          hFlush h
-          do
-            line <- Text.strip <$> Text.hGetLine h
-            when (line /= "OK") do
-              putStrLn $ "'watch mutations' failed: " <> show line
-
-          fix \loop -> do
-            line <- Text.strip <$> Text.hGetLine h
-            forM_ (parseWatchMutationsLine line) \(key, ttl) -> do
-              let key' = Text.encodeUtf8 key
-              m_value <- MC.get selfClient key'
-              forM_ m_value \(value, flags, _) -> do
-                when (flags .&. FLAG_REPLICATED == 0) $
-                  squashException "replicating key" $
-                    void $ MC.allOp allClient $ MC.emptyReq { MC.reqOp = MC.ReqSet MC.Loud key' value (MC.SESet (flags .|. FLAG_REPLICATED) ttl) }
-
-            when (line /= "" && line /= "END") loop
-
-      watchSelfForever = forever do
-        watchSelf
-        threadDelay 1000000
-
-      copyFromServer addr = do
+  let copyFromServer addr = do
         let ip = showIP (addrAddress addr)
-        client <- MC.newClient [toServerSpec addr] MC.def
 
         squashException ("copying data from " <> ip) do
           log $ "copying data from " <> ip
+
+          client <- MC.newClient [toServerSpec addr] MC.def
 
           bracket (Socket.openSocket addr) Socket.close \s1 -> do
             Socket.connect s1 (addrAddress addr)
@@ -145,7 +83,7 @@ main = do
         addrs <- retryForever "getServers" getServers
         mapConcurrently_ copyFromServer addrs
 
-  concurrently_ watchSelfForever copyFromOthers
+  copyFromOthers
       
 isSameAs :: MC.Client -> MC.Client -> IO Bool
 isSameAs selfClient client = do
@@ -160,13 +98,6 @@ parseMetadumpLine t = do
   a:b:_ <- pure $ Text.split (== ' ') t
   key <- Text.stripPrefix "key=" a
   expirationTime <- Text.stripPrefix "exp=" b >>= readMaybe . Text.unpack
-  pure (URIEncode.decodeText key, expirationTime)
-
-parseWatchMutationsLine :: Text -> Maybe (Text, Expiration)
-parseWatchMutationsLine t = do
-  _ts:_gid:_type:a:_status:_cmd:b:_ <- pure $ Text.split (== ' ') t
-  key <- Text.stripPrefix "key=" a
-  expirationTime <- Text.stripPrefix "ttl=" b >>= readMaybe . Text.unpack
   pure (URIEncode.decodeText key, expirationTime)
 
 showIP :: Socket.SockAddr -> String
@@ -200,4 +131,4 @@ rethrowIfAsync e =
     throwIO ae
 
 log :: String -> IO ()
-log s = putStrLn $ "memcached-replicator: " <> s
+log s = putStrLn $ "memcached-copy: " <> s
