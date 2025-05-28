@@ -24,6 +24,7 @@ dependencies:
 - async
 - vector
 - containers
+- iproute
 
 ghc-options:
 - -Wall
