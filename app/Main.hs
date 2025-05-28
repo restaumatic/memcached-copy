@@ -55,11 +55,11 @@ main = do
           Right ipList -> do
             let addrs = map (Socket.SockAddrInet 11211 . Socket.tupleToHostAddress . toTuple) ipList
             catMaybes <$> forConcurrently addrs \addr -> do
-          isSelf <- bracket (MC.newClient [toServerSpec addr] MC.def) MC.quit (isSameAs selfClient)
-          if isSelf then do
-            pure Nothing
-          else
-            pure $ Just addr
+              isSelf <- bracket (MC.newClient [toServerSpec addr] MC.def) MC.quit (isSameAs selfClient)
+              if isSelf then do
+                pure Nothing
+              else
+                pure $ Just addr
 
       toServerSpec :: SockAddr -> MC.ServerSpec
       toServerSpec addr = MC.def { MC.ssHost = showIP addr }
