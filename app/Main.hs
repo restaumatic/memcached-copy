@@ -12,6 +12,7 @@ import System.Environment (getArgs)
 import Network.Socket (defaultHints, AddrInfo (..), SocketType (..))
 import Network.DNS (lookupA, makeResolvSeed, withResolver, defaultResolvConf)
 import Data.Either (fromRight)
+import qualified Data.ByteString.Char8 as BS
 import qualified Network.Socket  as Socket
 import Control.Monad (forM_, when, void)
 import Control.Exception
@@ -46,8 +47,8 @@ main = do
 
   let getServers = do
         rs <- makeResolvSeed defaultResolvConf
-        ips <- withResolver rs $ \resolver -> lookupA resolver hostname
-        let addrs = map (\ip -> AddrInfo [] Stream defaultHints (Socket.SockAddrInet 11211 (Socket.tupleToHostAddress (fromIntegral <$> ip))) Nothing Nothing) (fromRight [] ips)
+        ips <- withResolver rs $ \resolver -> lookupA resolver (BS.pack hostname)
+        let addrs = map (\ip -> AddrInfo (Just Socket.AF_INET) Socket.Stream Socket.defaultProtocol (Socket.SockAddrInet 11211 (Socket.tupleToHostAddress (fromIntegral <$> ip))) Nothing Nothing) (fromRight [] ips)
         catMaybes <$> forConcurrently addrs \addr -> do
           isSelf <- bracket (MC.newClient [toServerSpec addr] MC.def) MC.quit (isSameAs selfClient)
           if isSelf then do
