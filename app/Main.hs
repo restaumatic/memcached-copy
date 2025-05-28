@@ -9,7 +9,7 @@ module Main (main) where
 
 import Prelude hiding (log)
 import System.Environment (getArgs)
-import Network.Socket (defaultHints, SocketType (..), SockAddr)
+import Network.Socket (SockAddr)
 import Network.DNS (lookupA, makeResolvSeed, withResolver, defaultResolvConf)
 import Data.IP (fromIPv4)
 import Data.Either (fromRight)
@@ -24,7 +24,7 @@ import qualified Data.Text.IO as Text
 import qualified Data.Text.Encoding as Text
 import qualified Data.Text as Text
 import qualified Database.Memcache.Client as MC
-import Data.List (intercalate, sortOn)
+import Data.List (intercalate)
 import Data.Text (Text)
 import qualified Network.URI.Encode as URIEncode
 import System.Random (randomIO)
@@ -42,14 +42,12 @@ pattern FLAG_REPLICATED = 1
 main :: IO ()
 main = do
   [hostname, self] <- getArgs
-  let hints = defaultHints
-
   selfClient <- MC.newClient [MC.def { MC.ssHost = self }] MC.def
 
   let getServers = do
         rs <- makeResolvSeed defaultResolvConf
         ips <- withResolver rs $ \resolver -> lookupA resolver (BS.pack hostname)
-        let addrs = map (\ip -> Socket.SockAddrInet 11211 (Socket.tupleToHostAddress (toTuple ip))) (fromRight [] ips)
+        let addrs = map (Socket.SockAddrInet 11211 . Socket.tupleToHostAddress . toTuple) (fromRight [] ips)
             toTuple ip = case fromIPv4 ip of
               [a, b, c, d] -> (fromIntegral a, fromIntegral b, fromIntegral c, fromIntegral d)
               _ -> error "Invalid IPv4 address format"
@@ -94,7 +92,7 @@ main = do
         mapConcurrently_ copyFromServer addrs
 
   copyFromOthers
-      
+
 isSameAs :: MC.Client -> MC.Client -> IO Bool
 isSameAs selfClient client = do
   randomKey <- Text.encodeUtf8 . Text.pack . show <$> randomIO @Int

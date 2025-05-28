@@ -37,6 +37,8 @@ executable memcached-copy
     , base >=4.7 && <5
     , bytestring
     , containers
+    , dns
+    , iproute
     , memcache
     , network
     , random
