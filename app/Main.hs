@@ -11,7 +11,7 @@ import Prelude hiding (log)
 import System.Environment (getArgs)
 import Network.Socket (SockAddr)
 import Network.DNS (lookupA, makeResolvSeed, withResolver, defaultResolvConf)
-import Data.IP (fromIPv4)
+import Data.IP (IPv4, fromIPv4)
 import Data.Either (fromRight)
 import qualified Data.ByteString.Char8 as BS
 import qualified Network.Socket  as Socket
@@ -54,7 +54,7 @@ main = do
           Left err -> throwIO $ userError $ "DNS lookup failed: " <> show err
           Right ipList -> do
             let addrs = map (Socket.SockAddrInet 11211 . Socket.tupleToHostAddress . toTuple) ipList
-        catMaybes <$> forConcurrently addrs \addr -> do
+            catMaybes <$> forConcurrently addrs \addr -> do
           isSelf <- bracket (MC.newClient [toServerSpec addr] MC.def) MC.quit (isSameAs selfClient)
           if isSelf then do
             pure Nothing
