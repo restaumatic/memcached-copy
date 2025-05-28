@@ -9,7 +9,7 @@ module Main (main) where
 
 import Prelude hiding (log)
 import System.Environment (getArgs)
-import Network.Socket (defaultHints, AddrInfo (..), SocketType (..))
+import Network.Socket (defaultHints, AddrInfo (..), SocketType (..), SockAddr)
 import Network.DNS (lookupA, makeResolvSeed, withResolver, defaultResolvConf)
 import Data.Either (fromRight)
 import qualified Data.ByteString.Char8 as BS
@@ -48,7 +48,7 @@ main = do
   let getServers = do
         rs <- makeResolvSeed defaultResolvConf
         ips <- withResolver rs $ \resolver -> lookupA resolver (BS.pack hostname)
-        let addrs = map (\ip -> AddrInfo defaultHints { addrFamily = Socket.AF_INET, addrSocketType = Socket.Stream, addrProtocol = Socket.defaultProtocol } (Socket.SockAddrInet 11211 (Socket.tupleToHostAddress (fromIntegral <$> ip))) Nothing Nothing) (fromRight [] ips)
+        let addrs = map (\ip -> AddrInfo { addrFlags = [], addrFamily = Socket.AF_INET, addrSocketType = Socket.Stream, addrProtocol = Socket.defaultProtocol, addrAddress = Socket.SockAddrInet 11211 (Socket.tupleToHostAddress (fromIntegral <$> ip)), addrCanonName = Nothing }) (fromRight [] ips)
         catMaybes <$> forConcurrently addrs \addr -> do
           isSelf <- bracket (MC.newClient [toServerSpec addr] MC.def) MC.quit (isSameAs selfClient)
           if isSelf then do
@@ -56,6 +56,7 @@ main = do
           else
             pure $ Just addr
 
+      toServerSpec :: AddrInfo -> MC.ServerSpec
       toServerSpec addr = MC.def { MC.ssHost = showIP (addrAddress addr) }
 
   let copyFromServer addr = do
