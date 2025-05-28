@@ -34,6 +34,8 @@ import Data.Word
 import Control.Concurrent (threadDelay)
 import Text.Read (readMaybe)
 import Database.Memcache.Types (Expiration)
+import Data.IORef (newIORef, readIORef)
+import GHC.IORef (atomicModifyIORef'_)
 
 pattern FLAG_REPLICATED :: Word32
 pattern FLAG_REPLICATED = 1
@@ -65,6 +67,8 @@ main = do
       toServerSpec :: SockAddr -> MC.ServerSpec
       toServerSpec addr = MC.def { MC.ssHost = showIP addr }
 
+  numCopied <- newIORef (0 :: Int)
+
   let copyFromServer addr = do
         let ip = showIP addr
 
@@ -88,6 +92,9 @@ main = do
                 m_value <- MC.get client key'
                 forM_ m_value \(value, flags, _) -> do
                   void $ MC.set selfClient key' value (flags .|. FLAG_REPLICATED) expirationTime
+                  (_, copied) <- atomicModifyIORef'_ numCopied (+1)
+                  when (copied `mod` 1000 == 0) $ do
+                    log $ "Copied " <> show copied <> " items"
 
               when (line /= "" && line /= "END") loop
 
@@ -96,6 +103,9 @@ main = do
         mapConcurrently_ copyFromServer addrs
 
   copyFromOthers
+
+  copied <- readIORef numCopied
+  log $ "Copied " <> show copied <> " items"
 
 isSameAs :: MC.Client -> MC.Client -> IO Bool
 isSameAs selfClient client = do
