@@ -12,7 +12,6 @@ import System.Environment (getArgs)
 import Network.Socket (SockAddr)
 import Network.DNS (lookupA, makeResolvSeed, withResolver, defaultResolvConf)
 import Data.IP (IPv4, fromIPv4)
-import Data.Either (fromRight)
 import qualified Data.ByteString.Char8 as BS
 import qualified Network.Socket  as Socket
 import Control.Monad (forM_, when, void)
@@ -43,6 +42,8 @@ toTuple :: IPv4 -> (Word8, Word8, Word8, Word8)
 toTuple ip = case fromIPv4 ip of
   [a, b, c, d] -> (fromIntegral a, fromIntegral b, fromIntegral c, fromIntegral d)
   _ -> error "Invalid IPv4 address format"
+
+main :: IO ()
 main = do
   [hostname, self] <- getArgs
   selfClient <- MC.newClient [MC.def { MC.ssHost = self }] MC.def
@@ -50,16 +51,16 @@ main = do
   let getServers = do
         rs <- makeResolvSeed defaultResolvConf
         ips <- withResolver rs $ \resolver -> lookupA resolver (BS.pack hostname)
-        case ips of
+        ipList <- case ips of
           Left err -> throwIO $ userError $ "DNS lookup failed: " <> show err
-          Right ipList -> do
-            let addrs = map (Socket.SockAddrInet 11211 . Socket.tupleToHostAddress . toTuple) ipList
-            catMaybes <$> forConcurrently addrs \addr -> do
-              isSelf <- bracket (MC.newClient [toServerSpec addr] MC.def) MC.quit (isSameAs selfClient)
-              if isSelf then do
-                pure Nothing
-              else
-                pure $ Just addr
+          Right ipList -> pure ipList
+        let addrs = map (Socket.SockAddrInet 11211 . Socket.tupleToHostAddress . toTuple) ipList
+        catMaybes <$> forConcurrently addrs \addr -> do
+          isSelf <- bracket (MC.newClient [toServerSpec addr] MC.def) MC.quit (isSameAs selfClient)
+          if isSelf then do
+            pure Nothing
+          else
+            pure $ Just addr
 
       toServerSpec :: SockAddr -> MC.ServerSpec
       toServerSpec addr = MC.def { MC.ssHost = showIP addr }
