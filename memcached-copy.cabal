@@ -5,7 +5,7 @@ cabal-version: 2.2
 -- see: https://github.com/sol/hpack
 
 name:           memcached-copy
-version:        0.1.0.0
+version:        0.6.0.0
 description:    memcached-copy
 homepage:       https://github.com/restaumatic/memcached-copy#readme
 bug-reports:    https://github.com/restaumatic/memcached-copy/issues
