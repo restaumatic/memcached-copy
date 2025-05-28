@@ -10,7 +10,7 @@ module Main (main) where
 import Prelude hiding (log)
 import System.Environment (getArgs)
 import Network.Socket (defaultHints, SocketType (..), SockAddr)
-import Network.DNS (lookupA, makeResolvSeed, withResolver, defaultResolvConf)
+import Network.DNS (lookupA, makeResolvSeed, withResolver, defaultResolvConf, fromIPv4)
 import Data.Either (fromRight)
 import qualified Data.ByteString.Char8 as BS
 import qualified Network.Socket  as Socket
@@ -69,7 +69,7 @@ main = do
           client <- MC.newClient [toServerSpec addr] MC.def
 
           bracket (Socket.openSocket addr) Socket.close \s1 -> do
-            Socket.connect s1 (addrAddress addr)
+            Socket.connect s1 addr
             h <- Socket.socketToHandle s1 ReadWriteMode
             hSetBuffering h (BlockBuffering Nothing)
 
