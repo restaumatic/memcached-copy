@@ -13,7 +13,7 @@ It assumes some things about your architecture:
 
 **Important**: Using this system will severely relax the consistency guarantees you would get from a single-node system. In particular:
 
-- `DELETE`s are unreliable. In fact, `memcached-replicator` doesn't replicate DELETEs at all. We discourage using them for invalidation in this architecture
+- `DELETE`s are unreliable. In fact, `memcached-copy` doesn't replicate DELETEs at all. We discourage using them for invalidation in this architecture
 - `SET`s may also fail to overwrite an older value. (Note that `SET`s are always unreliable in some sense in memcached, since any key can be evicted; but single-node memcached doesn't allow a key to return to a previous value).
 
 In short, when using this system, if you read from memcached, you can get not only the latest value, but any value previously written to a given key (although most of the time it should be the latest value). In particular it could happen that a server with older value replicates it to other servers (including ones that have latest value).
@@ -33,7 +33,7 @@ Where:
 
 Note: port is hardcoded to `11211`. If you want to change it, you need to patch this software.
 
-On startup, `replicator` discovers other servers and unceremoniously copies all data from them to the local server.
+On startup, `memcached-copy` discovers other servers and unceremoniously copies all data from them to the local server.
 
 ## Application usage
 

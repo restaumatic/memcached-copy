@@ -35,10 +35,10 @@ jobs:
     - name: Zip
       run: |
         cd dist
-        tar czvf memcached-replicator-linux.tar.gz memcached-replicator
+        tar czvf memcached-copy-linux.tar.gz memcached-copy
     - name: Archive production artifacts
       uses: actions/upload-artifact@v2
       with:
-        name: memcached-replicator-linux.tar.gz
+        name: memcached-copy-linux.tar.gz
         path: |
-          dist/memcached-replicator-linux.tar.gz
+          dist/memcached-copy-linux.tar.gz
