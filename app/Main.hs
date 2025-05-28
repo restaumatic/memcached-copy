@@ -10,7 +10,8 @@ module Main (main) where
 import Prelude hiding (log)
 import System.Environment (getArgs)
 import Network.Socket (defaultHints, SocketType (..), SockAddr)
-import Network.DNS (lookupA, makeResolvSeed, withResolver, defaultResolvConf, fromIPv4)
+import Network.DNS (lookupA, makeResolvSeed, withResolver, defaultResolvConf)
+import Data.IP (fromIPv4)
 import Data.Either (fromRight)
 import qualified Data.ByteString.Char8 as BS
 import qualified Network.Socket  as Socket
